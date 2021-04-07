@@ -1,0 +1,89 @@
+#!/bin/bash
+
+######################
+################
+#
+# vessl - 0.1
+#
+#	Usage: vessl -h host [-p port] [-c certfile] [-v]	
+#
+# This is a little script which gets and verifies ssl certificates
+#
+#		Copyright (C) 21/08/2008 - deanx <RID[at]portcullis-secuirty.com>
+#	
+#	Version 0.1 
+#	
+#	* This program is free software; you can redistribute it and/or modify
+#	* it under the terms of the GNU General Public License as published by
+# 	* the Free Software Foundation; either version 2 of the License, or
+#	* (at your option) any later version.
+#	*
+# 	* This program is distributed in the hope that it will be useful,
+# 	* but WITHOUT ANY WARRANTY; without even the implied warranty of
+# 	* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# 	* GNU General Public License for more details.
+# 	*
+# 	* You should have received a copy of the GNU General Public License
+# 	* along with this program; if not, write to the Free Software
+# 	* Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.	
+#
+###############
+#####################
+
+
+port="443"
+host="NOTSET"
+cafile="/etc/certs/mozilla.pem"
+verify=`mktemp -t vessl`
+cert=`mktemp -t vessl`
+
+while getopts "h:p:?c:v" o
+	do
+		case "$o" in
+			h)	host="$OPTARG";;
+			p)	port="$OPTARG";;
+			c)	cafile="$OPTARG";;
+			v)	verbose=1;;
+			[?])	echo "Usage: $0 -h host [-p port] [-c certfile] [-v]" 
+				exit 1;;
+		esac
+	done
+
+if [ $host = "NOTSET" ]
+	then echo "Usage: $0 -h host [-p port] [-c certfile] [-v]"
+	exit 1
+fi
+
+ip=`ping -c 1 -t 1 -i 1 $host 2>/dev/null| grep data | cut -d\( -f 2| cut -f 1 -d\)`
+
+if [ ! $verbose ];
+	then echo "Connecting to $host:$port which resolves as $ip"
+fi
+
+echo "Connecting to $host:$port which resolves as $ip" >> $verify
+echo | openssl s_client -showcerts -verify 9 -CAfile $cafile -connect $host:$port 2>>$verify | openssl x509 -text > $cert
+
+rhost=`openssl x509 -subject -in $cert -noout | grep "/CN.*" -o |cut -f 2 -d= | cut -f1 -d/`
+rip=`ping -c 1 -t 1 -i 1 $rhost 2>/dev/null| grep data | cut -d\( -f 2| cut -f 1 -d\)`
+
+if [ "$rip" = "" ];then
+	rip="Cannot Resolve Host"
+fi
+
+if [ "$ip" = "$rip" ]; then
+	echo "Host in certificate matches given IP " $rip >> $verify
+else
+	echo "verify error:num=99:ip mismatch given vs cert ($ip vs $rip ($rhost))" >> $verify	
+fi
+
+echo "$ip:$port, $rhost ($rip)" >> $verify
+echo "$ip:$port, $rhost ($rip)" >> sslmap
+
+if [ $verbose ]; then
+	cat $verify
+fi
+
+cp $verify $ip\:$port.verify
+cp $cert $ip\:$port.cert
+rm $verify
+rm $cert

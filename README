@@ -1,0 +1,37 @@
+
+##############################
+##############
+#
+# vessl - 0.1 
+#
+#######
+#################
+
+
+vessl - a shell wrapper to openssl which verifies ssl certificates
+
+Usage: vessl -h host [-p port] [-c certfile] [-v]
+
+By default the output will be 3 files:
+	
+	ip:port.verify
+	ip:port.cert
+	sslmap
+
+The first is the verification data, the second is the certificate and the third maps IP to SSL Hostname 
+
+The script requires a vaild PEM certificate repository which is by defailt looked for in /etc/certs/mozilla.pem
+
+The PEM file can be created by extracting them from your browser of chioce. There is also a debain package and ebuild which contains them. Once the individual files are created they can just be cated together to create one large file.
+
+== Gentoo ==
+
+emerge ca-certificates
+mkdir /etc/certs
+cat /usr/share/ca-certificates/mozilla/* /etc/certs/mozilla.pem
+
+
+
+
+
+
