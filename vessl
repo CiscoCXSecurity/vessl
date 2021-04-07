@@ -3,7 +3,7 @@
 ######################
 ################
 #
-# vessl - 0.1
+# vessl - 0.2
 #
 #	Usage: vessl -h host [-p port] [-c certfile] [-v]	
 #
@@ -11,7 +11,7 @@
 #
 #		Copyright (C) 21/08/2008 - deanx <RID[at]portcullis-secuirty.com>
 #	
-#	Version 0.1 
+#	Version 0.2 
 #	
 #	* This program is free software; you can redistribute it and/or modify
 #	* it under the terms of the GNU General Public License as published by
@@ -44,24 +44,38 @@ while getopts "h:p:?c:v" o
 			p)	port="$OPTARG";;
 			c)	cafile="$OPTARG";;
 			v)	verbose=1;;
-			[?])	echo "Usage: $0 -h host [-p port] [-c certfile] [-v]" 
+			[?])	echo -en "    Usage: $0 -h host [-p port] [-c certfile] [-v]\n\n" 
 				exit 1;;
 		esac
 	done
 
 if [ $host = "NOTSET" ]
-	then echo "Usage: $0 -h host [-p port] [-c certfile] [-v]"
+	then 
+	echo -en "\n\t[!] hostname (-h) is required\n\n"
+	echo -en "    Usage: $0 -h host [-p port] [-c certfile] [-v]\n\n"
+	exit 1
+fi
+
+if [ ! -r $cafile ]
+	then echo -en "\n\t[!] \"$cafile\" does not exists, please specify one with -c or copy it to the default location\n\n"
 	exit 1
 fi
 
 ip=`ping -c 1 -t 1 -i 1 $host 2>/dev/null| grep data | cut -d\( -f 2| cut -f 1 -d\)`
 
 if [ ! $verbose ];
-	then echo "Connecting to $host:$port which resolves as $ip"
+	then echo -en "\n\t[+] Connecting to $host:$port which resolves as $ip\n\n"
 fi
 
 echo "Connecting to $host:$port which resolves as $ip" >> $verify
-echo | openssl s_client -showcerts -verify 9 -CAfile $cafile -connect $host:$port 2>>$verify | openssl x509 -text > $cert
+echo | openssl s_client -showcerts -verify 9 -CAfile $cafile -connect $host:$port 2>>$verify | openssl x509 -text 2>/dev/null > $cert
+
+if [ $? -ne  0 ]; then
+	echo -en "\t[!] Connection/Certificate Retrieval Failed\n\n";
+	rm $verify
+	rm $cert
+	exit 1
+fi
 
 rhost=`openssl x509 -subject -in $cert -noout | grep "/CN.*" -o |cut -f 2 -d= | cut -f1 -d/`
 rip=`ping -c 1 -t 1 -i 1 $rhost 2>/dev/null| grep data | cut -d\( -f 2| cut -f 1 -d\)`
